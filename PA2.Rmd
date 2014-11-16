@@ -60,6 +60,46 @@ head (stormdata)
 
 ```
 
+``` {r StormData Table, echo=FALSE}
+#Rough codebook found here: https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005#curr. lists 48 Events.  Clean up the data making some assumptions as to what event goes where.
+#
+#2.1.1 Storm Data Event Table
+# Event Name Designator        Event Name Designator
+# Astronomical Low Tide Z      Hurricane (Typhoon) Z
+# Avalanche Z                  Ice Storm Z
+# Blizzard Z                   Lake-Effect Snow Z
+# Coastal Flood Z              Lakeshore Flood Z
+# Cold/Wind Chill Z            Lightning C
+# Debris Flow C                Marine Hail M
+# Dense Fog Z                  Marine High Wind M
+# Dense Smoke Z                Marine Strong Wind M 
+# Drought Z                    Marine Thunderstorm Wind M
+# Dust Devil C                 Rip Current Z
+# Dust Storm Z                 Seiche Z
+# Excessive Heat Z             Sleet Z
+# Extreme Cold/Wind Chill Z    Storm Surge/Tide Z
+# Flash Flood C                Strong Wind Z
+# Flood C                      Thunderstorm Wind C
+# Frost/Freeze Z               Tornado C
+# Funnel Cloud C               Tropical Depression Z
+# Freezing Fog Z               Tropical Storm Z
+# Hail C                       Tsunami Z
+# Heat Z                       Volcanic Ash Z
+# Heavy Rain C                 Waterspout M
+# Heavy Snow Z                 Wildfire Z
+# High Surf Z                  Winter Storm Z
+# High Wind Z                  Winter Weather Z
+           
+
+ 
+ 
+ 
+Legend: There are three designators: C - County/Parish; Z - Zone; and M - Marine. (Refer to 
+Section 2.4 to find instructions on how to designate Alaska Region events.) 
+___________________________________________________________________________ 
+Table 1. Storm Data Event Table
+```
+
 ``` {r cleandata}
 # remove any rows that don't have any fatalities, injuries or damage
 stormdata <- stormdata[apply(stormdata[c(2,3,4,6)],1,function(z) any(z!=0)),] 
@@ -70,45 +110,123 @@ stormdata$EVTYPE <- as.factor (toupper (stormdata$EVTYPE))
 
 #
 #There are a bunch of Event Types that are obvious typos and variations 
+#There are also far many events than the 48 called out in the Cookbook Table 2.1.1
+# located here: https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf
+
 #Let's first consolidate and clean up a bit.
 
+# Create an AVALANCHE Group (mainly fix spelling error)
 #
-#Create a WINTER WEATHER GROUP
-#
-stormdata[grep("WINTRY|WINTER WEATHER|WINTER STORM",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
-stormdata[grep("HEAVY MIX|MIXED PRECIP|FREEZING SPRAY",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
-stormdata[grep("FREEZING RAIN|RAIN/SNOW|FREEZING DRIZZLE",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("AVALANCE",stormdata$EVTYPE),]$EVTYPE <- "AVALANCHE"
 #
 # Create a BLIZZARD Group
 #
 stormdata[grep("BLIZZARD",stormdata$EVTYPE),]$EVTYPE <- "BLIZZARD"
 #
-# Create a TORNADO Group
+# Create COASTAL FLOOD Group
 #
-stormdata[grep("POUT|TORNADO|TORNDAO|FUNNEL CLOUD",stormdata$EVTYPE),]$EVTYPE <- "TORNADO"
+#Put Coastal Surge into Storm Surge/Tide group instead of Coastal Flooding
+stormdata[grep("COASTAL SURGE",stormdata$EVTYPE),]$EVTYPE <- "STORM SURGE/TIDE" 
+stormdata[grep("COASTAL|BEACH EROSION|CSTL FLOOD|TIDAL FLOODING|ASTRONOMICAL HIGH TIDE",stormdata$EVTYPE),]$EVTYPE <- "COASTAL FLOOD"
 #
-# Create a FIRE Group 
-# (this involves creating a new level as well since there are different types of fires)
+# Create a COLD Groups
 #
-levels(stormdata$EVTYPE) <- c(levels(stormdata$EVTYPE), "FIRE")
-#Include smoke because where there's smoke there's fire
-stormdata[grep("WILDFIRE|FIRE|DENSE SMOKE",stormdata$EVTYPE),]$EVTYPE <- "FIRE"
+#put COLD AIR TORNADO in the TORNADO GROUP
+stormdata[grep("COLD AIR TORNADO",stormdata$EVTYPE),]$EVTYPE <- "TORNADO"
+stormdata[grep("^COLD|HYPOTHERMIA|LOW TEMPERATURE",stormdata$EVTYPE),]$EVTYPE  <-"COLD/WIND CHILL"
+stormdata[grep(" COLD|WINDCHILL|EXTREME WIND CHILL",stormdata$EVTYPE),]$EVTYPE <- "EXTREME COLD/WIND CHILL"
 #
-# Create Gusty WIND group
+# combine the FOG entries into DENSE FOG, except FREEZING FOG
+stormdata[grep("DENSE FOG|^FOG",stormdata$EVTYPE),]$EVTYPE <- "DENSE FOG"
 #
-stormdata[grep("GUSTY WIND|GUSTNADO",stormdata$EVTYPE),]$EVTYPE <- "GUSTY WIND"
+# combine the DROUGHT entries into one
+stormdata[grep("DROUGHT",stormdata$EVTYPE),]$EVTYPE <- "DROUGHT"
+# Create DUST Events: Devil & Storm
+#
+stormdata[grep("DUST DEVIL",stormdata$EVTYPE),]$EVTYPE <- "DUST DEVIL"
+stormdata[grep("DUST STORM|BLOWING DUST",stormdata$EVTYPE),]$EVTYPE <- "DUST STORM"
+#
+# Group HEAT Events
+#
+stormdata[grep("HEAT WAVE|RECORD HEAT|RECORD/EXCESSIVE HEAT|EXTREME HEAT",stormdata$EVTYPE),]$EVTYPE <- "EXCESSIVE HEAT"
+stormdata[grep("HYPERTHERMIA|WARM",stormdata$EVTYPE),]$EVTYPE="HEAT"
+#
+# combine the FLOOD Groups(FLASH-COMBINE FLash type events, FLOOD-All Other)
+stormdata[grep("FLASH|DAM BREAK|RAPIDLY RISING WATER",stormdata$EVTYPE),]$EVTYPE <- "FLASH FLOOD"
+stormdata[grep("FLOODING|HIGH WATER|ICE JAM",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
+stormdata[grep("RIVER FL|URBAN FL|RURAL FL|LAKE FL|STREAM FL",stormdata$EVTYPE),]$EVTYPE<- "FLOOD"
+stormdata[grep("FLOODS|MAJOR FL|& FLOOD|AND FLOOD|FLOOD &",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
+stormdata[grep("FLOOD/|/ FLOOD|LAKESHORE FL",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
 #
 # Create FREEZE Group
 #
 stormdata[grep("FREEZE|FROST",stormdata$EVTYPE),]$EVTYPE <- "FROST/FREEZE"
 #
+# Create HAIL Group
+#
+stormdata[grep("^HAIL|SMALL HAIL|/HAIL",stormdata$EVTYPE),]$EVTYPE <- "HAIL"
+#
+# Create a HEAVY RAIN Group (INCLUDE HEAVY PERCIP BECAUSE DATA COMMENT DISCUSSES RAINFALL)
+#
+stormdata[grep("FREEZING RAIN",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("HEAVY RAIN|WETNESS|HEAVY SHOWER|HVY RAIN|HEAVY PRECIPITATION",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
+stormdata[grep("RECORD RAIN|RAINSTORM|UNSEASONAL RAIN|EXCESSIVE RAIN|RAIN/",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
+stormdata[grep("TORRENTIAL RAIN|WIND/RAIN",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
+#
+# Create a HEAVY SNOW Group
+#
+stormdata[grep("HEAVY SNOW|RECORD SNOW|EXCESSIVE SNOW",stormdata$EVTYPE),]$EVTYPE <- "HEAVY SNOW"
+stormdata[grep("HEAVY LAKE SNOW|LATE SEASON",stormdata$EVTYPE),]$EVTYPE <- "HEAVY SNOW"
+#
+# Create a HIGH SURF Group (Put RIP CURRENTS/SURF into RIP CURRENTS FIRST)
+#
+stormdata[grep("RIP",stormdata$EVTYPE),]$EVTYPE="RIP CURRENT"
+stormdata[grep("SURF",stormdata$EVTYPE),]$EVTYPE<-"HIGH SURF"
+#
+#
+# Create a HIGHWINDS
+#
+#raw data suggests this lone "HIGH" is high winds
+stormdata[stormdata$EVTYPE == "HIGH",]$EVTYPE <- "HIGH WINDS" 
+stormdata[grep("^HIGH WIND|HIGH  WINDS",stormdata$EVTYPE),]$EVTYPE <- "HIGH WINDS"
+
+
+
+
+
+#
+# Create a STRONG WINDS Group
+stormdata[grep("^WIND|GUSTY WIND|SEVERE TURBULENCE|^STRONG WIND|^GRADIENT",stormdata$EVTYPE),]$EVTYPE<-"STRONG WIND"
+#
+# Create a ICE Group before snow because a snow only group would pull out ICE AND SNOW 
+# assumption is if ICE is listed first, it is more impactful.
+#
+stormdata[grep("^ICE|^ICY|GLAZE|BLACK ICE|ICE STORM",stormdata$EVTYPE),]$EVTYPE <- "ICE STORM"
+#
+#Create a WINTER WEATHER GROUP
+#
+stormdata[grep("WINTRY|WINTER WEATHER|WINTER STORM",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("HEAVY MIX|MIXED PRECIP|FREEZING SPRAY",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("RAIN/SNOW|FREEZING DRIZZLE",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+
+#
+# Create a TORNADO Group
+#
+stormdata[grep("POUT|TORNADO|TORNDAO",stormdata$EVTYPE),]$EVTYPE <- "TORNADO"
+#
+# Create a FIRE Group 
+#
+stormdata[grep("WILDFIRE|FIRE",stormdata$EVTYPE),]$EVTYPE <- "WILDFIRE"
+#
+# Create Gusty WIND group
+#
+stormdata[grep("GUSTY WIND|GUSTNADO",stormdata$EVTYPE),]$EVTYPE <- "GUSTY WIND"
+
+#
 # Create LANDSLIDE Group
 #
 stormdata[grep("SLIDE|LANDSLUMP",stormdata$EVTYPE),]$EVTYPE <- "LANDSLIDE"
-#
-# Create Flood Group
-#
-stormdata[grep("FLOOD|DAM BREAK|COASTAL STORM|COASTAL SURGE|COASTALSTORM|TSUNAMI|STORM SURGE|HIGH WATER|ICE JAM|RAPIDLY RISING WATER",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
+
 #
 # Create LIGHTNING Group
 #
@@ -121,73 +239,25 @@ stormdata[grep("THUNDER|TSTM|BURST|TUNDERSTORM|THUNERSTORM|THUDER|THUNDEER",stor
 # Consolidate all TROPICAL STORM 
 #
 stormdata[grep("TROPICAL",stormdata$EVTYPE),]$EVTYPE <- "TROPICAL STORM"
-#
-# Create HAIL Group
-#
-stormdata[grep("^HAIL|SMALL HAIL|MARINE HAIL|/HAIL",stormdata$EVTYPE),]$EVTYPE <- "HAIL"
+
 #
 # Create a HURRICANE Group
 #
 stormdata[grep("HURRICANE|TYPHOON",stormdata$EVTYPE),]$EVTYPE <- "HURRICANE"
-#
-# Create DUST Events
-#
-stormdata[grep("DUST",stormdata$EVTYPE),]$EVTYPE <- "DUST STORM"
-#
-# Group HEAT Events
-#
-stormdata[grep("HEAT WAVE|RECORD HEAT|RECORD/EXCESSIVE HEAT|EXTREME HEAT",stormdata$EVTYPE),]$EVTYPE <- "EXCESSIVE HEAT"
-stormdata[grep("HYPERTHERMIA|WARM",stormdata$EVTYPE),]$EVTYPE="HEAT"
-#
-# Create a COLD Group
-#
-stormdata[grep("^COLD|HYPOTHERMIA|LOW TEMPERATURE",stormdata$EVTYPE),]$EVTYPE  <-"COLD/WIND CHILL"
-#
-# Create an EXTREME COLD Group
-#
-stormdata[grep(" COLD|WINDCHILL|EXTREME WIND CHILL",stormdata$EVTYPE),]$EVTYPE <- "EXTREME COLD/WIND CHILL"
-#
-# Create a ICE Group before snow because a snow only group would pull out ICE AND SNOW 
-# assumption is if ICE is listed first, it is more impactful.
-#
-stormdata[grep("^ICE|^ICY|GLAZE|BLACK ICE|SLEET",stormdata$EVTYPE),]$EVTYPE <- "ICE"
-#
-# Create a SNOW Group
-#
-stormdata[grep("SNOW",stormdata$EVTYPE),]$EVTYPE <- "SNOW"
-#
-# Create an AVALANCHE Group (mainly fix spelling error)
-#
-stormdata[grep("AVALANCE",stormdata$EVTYPE),]$EVTYPE <- "AVALANCHE"
-#
-# Create a RIP CURRENT Group
-#
-stormdata[grep("RIP|GRADIENT",stormdata$EVTYPE),]$EVTYPE="RIP CURRENT"
-#
-# Create a STRONG WINDS and plain old WIND Group
-#
-#raw data suggests this lone "HIGH" is high winds
-stormdata[stormdata$EVTYPE == "HIGH",]$EVTYPE <- "STRONG WINDS" 
-stormdata[grep("HIGH WIND|HIGH WINDS|HIGH  WINDS|GUSTY WIND|WIND DAMAGE|STRONG WIND|STORM FORCE WIND|WHIRLWIND",stormdata$EVTYPE),]$EVTYPE <- "STRONG WINDS"
-stormdata[grep("^WIND|SEVERE TURBULENCE",stormdata$EVTYPE),]$EVTYPE="WINDS"
-#
-# Create a SURF Group
-#
-stormdata[grep("SURF|EROSION|BEACH EROSIN|HEAVY SWELLS|HIGH WAVES|HIGH SWELLS",stormdata$EVTYPE),]$EVTYPE="HIGH SURF"
-stormdata[grep("HEAVY SEAS|HIGH TIDES|HIGH SEAS|ROGUE WAVE|ROUGH SEAS|SEICHE",stormdata$EVTYPE),]$EVTYPE="HIGH SURF"
+
+
+
+
+
+
+
 #
 # Create a SURF Group
 #
 stormdata[grep("URBAN",stormdata$EVTYPE),]$EVTYPE="URBAN AND SMALL"
-#
-# Create a RAIN Group (INCLUDE HEAVY PERCIP BECAUSE DATA COMMENT DISCUSSES RAINFALL)
-#
-stormdata[grep("RAIN|WETNESS|HEAVY SHOWER|HEAVY PRECIPITATION",stormdata$EVTYPE),]$EVTYPE <- "RAIN"
-#
-# combine the FOG entries into one
-stormdata[grep("FOG",stormdata$EVTYPE),]$EVTYPE <- "FOG"
-# combine the DROUGHT entries into one
-stormdata[grep("DROUGHT",stormdata$EVTYPE),]$EVTYPE <- "DROUGHT"
+
+
+
 
 #
 # Finally, create an OTHER group for things that don't fit nicely
