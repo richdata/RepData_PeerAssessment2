@@ -1,0 +1,22 @@
+{
+    "contents" : "",
+    "created" : 1416126684948.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "BA370EF8",
+    "lastKnownWriteTime" : 7741240722073845761,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "caption" : "injuries",
+        "contentUrl" : "content?title=injuries&file=a6e1697a53124d34865f1f5bb3c05c4e.htm",
+        "displayedObservations" : 30,
+        "displayedVariables" : 3,
+        "totalObservations" : 30,
+        "variables" : 3
+    },
+    "source_on_save" : false,
+    "type" : "r_dataframe"
+}

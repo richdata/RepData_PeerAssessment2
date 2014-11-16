@@ -1,0 +1,225 @@
+---
+title: "Reproducible Results - <BR>
+Analysis of  NOAA Storm Database"
+author: "richdata"
+date: "Tuesday, November 11, 2014"
+output: html_document
+---
+
+
+
+## Synopsis
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+The basic goal of this assignment is to explore the NOAA Storm Database and answer two questions about severe weather events. 
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?
+
+``` {r InitialSetup}
+#
+#install and load the ggplot2 package
+
+install.packages ("ggplot2")
+library (ggplot2)
+library (grid)  #needed for theme panel margin units
+
+#
+# Document the Software Environment to make it easily reproduced
+#
+sessionInfo ()
+
+```
+
+## Data Processing
+
+```{r getdata}
+setwd ("~/My Personal Stuff/coursera/Reproducible Research/Project2")
+
+# if the data directory doesn't exist create it
+
+if (!file.exists("Data")) {
+        dir.create("Data")
+        }
+
+#if the data file doesn't exist, the download it
+
+if(!file.exists("Data/repdata-data-StormData.csv.bz2")) {
+        fileURL <- "http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+        download.file(fileURL, destfile = "./Data/repdata-data-StormData.csv.bz2")
+        fileNAME <- "./Data/repdata-data-StormData.csv.bz2"
+        }
+
+stormdata <- read.csv(bzfile("./data/repdata-data-StormData.csv.bz2"))
+
+#strip out only data we're interested in
+stormdata <- stormdata [, c("EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
+head (stormdata)
+
+```
+
+``` {r cleandata}
+# remove any rows that don't have any fatalities, injuries or damage
+stormdata <- stormdata[apply(stormdata[c(2,3,4,6)],1,function(z) any(z!=0)),] 
+
+#make sure all datas are all upper case to normalize categories
+#for example Wintry mix, Wintry Mix and WINTRY MIX
+stormdata$EVTYPE <- as.factor (toupper (stormdata$EVTYPE))
+
+#
+#There are a bunch of Event Types that are obvious typos and variations 
+#Let's first consolidate and clean up a bit.
+
+#
+#Create a WINTER WEATHER GROUP
+#
+stormdata[grep("WINTRY|WINTER WEATHER|WINTER STORM",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("HEAVY MIX|MIXED PRECIP|FREEZING SPRAY",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("FREEZING RAIN|RAIN/SNOW|FREEZING DRIZZLE",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+#
+# Create a BLIZZARD Group
+#
+stormdata[grep("BLIZZARD",stormdata$EVTYPE),]$EVTYPE <- "BLIZZARD"
+#
+# Create a TORNADO Group
+#
+stormdata[grep("POUT|TORNADO|TORNDAO|FUNNEL CLOUD",stormdata$EVTYPE),]$EVTYPE <- "TORNADO"
+#
+# Create a FIRE Group 
+# (this involves creating a new level as well since there are different types of fires)
+#
+levels(stormdata$EVTYPE) <- c(levels(stormdata$EVTYPE), "FIRE")
+#Include smoke because where there's smoke there's fire
+stormdata[grep("WILDFIRE|FIRE|DENSE SMOKE",stormdata$EVTYPE),]$EVTYPE <- "FIRE"
+#
+# Create Gusty WIND group
+#
+stormdata[grep("GUSTY WIND|GUSTNADO",stormdata$EVTYPE),]$EVTYPE <- "GUSTY WIND"
+#
+# Create FREEZE Group
+#
+stormdata[grep("FREEZE|FROST",stormdata$EVTYPE),]$EVTYPE <- "FROST/FREEZE"
+#
+# Create LANDSLIDE Group
+#
+stormdata[grep("SLIDE|LANDSLUMP",stormdata$EVTYPE),]$EVTYPE <- "LANDSLIDE"
+#
+# Create Flood Group
+#
+stormdata[grep("FLOOD|DAM BREAK|COASTAL STORM|COASTAL SURGE|COASTALSTORM|TSUNAMI|STORM SURGE|HIGH WATER|ICE JAM|RAPIDLY RISING WATER",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
+#
+# Create LIGHTNING Group
+#
+stormdata[grep("LIGHTNING|LIGHTING|LIGNTNING",stormdata$EVTYPE),]$EVTYPE <- "LIGHTNING"
+#
+# Create a THUNDERSTORM Group
+#
+stormdata[grep("THUNDER|TSTM|BURST|TUNDERSTORM|THUNERSTORM|THUDER|THUNDEER",stormdata$EVTYPE),]$EVTYPE <- "THUNDERSTORMS"
+#
+# Consolidate all TROPICAL STORM 
+#
+stormdata[grep("TROPICAL",stormdata$EVTYPE),]$EVTYPE <- "TROPICAL STORM"
+#
+# Create HAIL Group
+#
+stormdata[grep("^HAIL|SMALL HAIL|MARINE HAIL|/HAIL",stormdata$EVTYPE),]$EVTYPE <- "HAIL"
+#
+# Create a HURRICANE Group
+#
+stormdata[grep("HURRICANE|TYPHOON",stormdata$EVTYPE),]$EVTYPE <- "HURRICANE"
+#
+# Create DUST Events
+#
+stormdata[grep("DUST",stormdata$EVTYPE),]$EVTYPE <- "DUST STORM"
+#
+# Group HEAT Events
+#
+stormdata[grep("HEAT WAVE|RECORD HEAT|RECORD/EXCESSIVE HEAT|EXTREME HEAT",stormdata$EVTYPE),]$EVTYPE <- "EXCESSIVE HEAT"
+stormdata[grep("HYPERTHERMIA|WARM",stormdata$EVTYPE),]$EVTYPE="HEAT"
+#
+# Create a COLD Group
+#
+stormdata[grep("^COLD|HYPOTHERMIA|LOW TEMPERATURE",stormdata$EVTYPE),]$EVTYPE  <-"COLD/WIND CHILL"
+#
+# Create an EXTREME COLD Group
+#
+stormdata[grep(" COLD|WINDCHILL|EXTREME WIND CHILL",stormdata$EVTYPE),]$EVTYPE <- "EXTREME COLD/WIND CHILL"
+#
+# Create a ICE Group before snow because a snow only group would pull out ICE AND SNOW 
+# assumption is if ICE is listed first, it is more impactful.
+#
+stormdata[grep("^ICE|^ICY|GLAZE|BLACK ICE|SLEET",stormdata$EVTYPE),]$EVTYPE <- "ICE"
+#
+# Create a SNOW Group
+#
+stormdata[grep("SNOW",stormdata$EVTYPE),]$EVTYPE <- "SNOW"
+#
+# Create an AVALANCHE Group (mainly fix spelling error)
+#
+stormdata[grep("AVALANCE",stormdata$EVTYPE),]$EVTYPE <- "AVALANCHE"
+#
+# Create a RIP CURRENT Group
+#
+stormdata[grep("RIP|GRADIENT",stormdata$EVTYPE),]$EVTYPE="RIP CURRENT"
+#
+# Create a STRONG WINDS and plain old WIND Group
+#
+#raw data suggests this lone "HIGH" is high winds
+stormdata[stormdata$EVTYPE == "HIGH",]$EVTYPE <- "STRONG WINDS" 
+stormdata[grep("HIGH WIND|HIGH WINDS|HIGH  WINDS|GUSTY WIND|WIND DAMAGE|STRONG WIND|STORM FORCE WIND|WHIRLWIND",stormdata$EVTYPE),]$EVTYPE <- "STRONG WINDS"
+stormdata[grep("^WIND|SEVERE TURBULENCE",stormdata$EVTYPE),]$EVTYPE="WINDS"
+#
+# Create a SURF Group
+#
+stormdata[grep("SURF|EROSION|BEACH EROSIN|HEAVY SWELLS|HIGH WAVES|HIGH SWELLS",stormdata$EVTYPE),]$EVTYPE="HIGH SURF"
+stormdata[grep("HEAVY SEAS|HIGH TIDES|HIGH SEAS|ROGUE WAVE|ROUGH SEAS|SEICHE",stormdata$EVTYPE),]$EVTYPE="HIGH SURF"
+#
+# Create a SURF Group
+#
+stormdata[grep("URBAN",stormdata$EVTYPE),]$EVTYPE="URBAN AND SMALL"
+#
+# Create a RAIN Group (INCLUDE HEAVY PERCIP BECAUSE DATA COMMENT DISCUSSES RAINFALL)
+#
+stormdata[grep("RAIN|WETNESS|HEAVY SHOWER|HEAVY PRECIPITATION",stormdata$EVTYPE),]$EVTYPE <- "RAIN"
+#
+# combine the FOG entries into one
+stormdata[grep("FOG",stormdata$EVTYPE),]$EVTYPE <- "FOG"
+# combine the DROUGHT entries into one
+stormdata[grep("DROUGHT",stormdata$EVTYPE),]$EVTYPE <- "DROUGHT"
+
+#
+# Finally, create an OTHER group for things that don't fit nicely
+
+stormdata[grep("\\?|APACHE|ASTRONOMICAL|DROWNING|MARINE|VOLCANIC",stormdata$EVTYPE),]$EVTYPE <- "OTHER"
+
+
+```
+
+## Results
+
+``` {r harmful_report}
+fatalities <- aggregate(FATALITIES~EVTYPE,data=stormdata,FUN=sum)
+fatalities$Type <- "Fatalities"
+colnames (fatalities) <- c("EVTYPE","NUMBER","Type")
+injuries   <- aggregate(INJURIES~EVTYPE,data=stormdata,FUN=sum)
+injuries$Type <- "Injuries"
+colnames(injuries) <- c("EVTYPE","NUMBER","Type")
+bodilyharm <- rbind(fatalities,injuries)
+bodilyharm$Type <- as.factor(bodilyharm$Type)
+
+
+#
+# Plot the events that were harmful to the population
+#
+#create a line plot to show trend
+g<- ggplot (bodilyharm, aes(x=EVTYPE, y=NUMBER, fill=factor(Type)))
+g + geom_bar(position="stack",stat="identity")+ 
+        labs(title="Event Types Harmful to Public Health",fill="",x="Event Type",y="Number of Fatalities/Injuries")+
+         theme(axis.text.x=element_text(angle=70,hjust=1))
+        
+
+
+
+```
