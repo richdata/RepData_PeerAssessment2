@@ -18,13 +18,19 @@ The basic goal of this assignment is to explore the NOAA Storm Database and answ
 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 2. Across the United States, which types of events have the greatest economic consequences?
 
-``` {r InitialSetup}
+## Data Processing 
+### Initialization
+To begin, some initial housekeeping is required to ensure this is a reproducible research project by installing/loading the needed datasets, documenting the environment, downloading the data and reading the file.  It should be noted that there was a considerable exploration effort outside of this document that gained some insights into the data.  Those efforts are not included here.
+
+
+``` {r initialsetup}
 #
 #install and load the ggplot2 package
 
-install.packages ("ggplot2")
+#install.packages ("ggplot2", repos="http://cran.rstudio.com/")
 library (ggplot2)
 library (grid)  #needed for theme panel margin units
+library (plyr)
 
 #
 # Document the Software Environment to make it easily reproduced
@@ -33,7 +39,6 @@ sessionInfo ()
 
 ```
 
-## Data Processing
 
 ```{r getdata}
 setwd ("~/My Personal Stuff/coursera/Reproducible Research/Project2")
@@ -56,49 +61,14 @@ stormdata <- read.csv(bzfile("./data/repdata-data-StormData.csv.bz2"))
 
 #strip out only data we're interested in
 stormdata <- stormdata [, c("EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
-head (stormdata)
 
 ```
 
-``` {r StormData Table, echo=FALSE}
-#Rough codebook found here: https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005#curr. lists 48 Events.  Clean up the data making some assumptions as to what event goes where.
-#
-#2.1.1 Storm Data Event Table
-# Event Name Designator        Event Name Designator
-# Astronomical Low Tide Z      Hurricane (Typhoon) Z
-# Avalanche Z                  Ice Storm Z
-# Blizzard Z                   Lake-Effect Snow Z
-# Coastal Flood Z              Lakeshore Flood Z
-# Cold/Wind Chill Z            Lightning C
-# Debris Flow C                Marine Hail M
-# Dense Fog Z                  Marine High Wind M
-# Dense Smoke Z                Marine Strong Wind M 
-# Drought Z                    Marine Thunderstorm Wind M
-# Dust Devil C                 Rip Current Z
-# Dust Storm Z                 Seiche Z
-# Excessive Heat Z             Sleet Z
-# Extreme Cold/Wind Chill Z    Storm Surge/Tide Z
-# Flash Flood C                Strong Wind Z
-# Flood C                      Thunderstorm Wind C
-# Frost/Freeze Z               Tornado C
-# Funnel Cloud C               Tropical Depression Z
-# Freezing Fog Z               Tropical Storm Z
-# Hail C                       Tsunami Z
-# Heat Z                       Volcanic Ash Z
-# Heavy Rain C                 Waterspout M
-# Heavy Snow Z                 Wildfire Z
-# High Surf Z                  Winter Storm Z
-# High Wind Z                  Winter Weather Z
-           
+### Cleaning the data
+To speed things up somewhat, the original dataset will be stripped of unnecessary columns and any rows that contain zero values in all relevant study variables (i.e. Fatalities, Injuries, Property Damage and Crop Damage).  This reduction will remove 30 variables and over 65,000 observations.
 
- 
- 
- 
-Legend: There are three designators: C - County/Parish; Z - Zone; and M - Marine. (Refer to 
-Section 2.4 to find instructions on how to designate Alaska Region events.) 
-___________________________________________________________________________ 
-Table 1. Storm Data Event Table
-```
+Additionally, the CODEBOOK associated with this dataset, https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf, suggests there are 48 unique events.  However, initial exploration of the EVTYPES in the dataset indicated there were 898 different event types!  Some significant cleaning and consolidation of the data will be needed.
+
 
 ``` {r cleandata}
 # remove any rows that don't have any fatalities, injuries or damage
@@ -152,11 +122,13 @@ stormdata[grep("HEAT WAVE|RECORD HEAT|RECORD/EXCESSIVE HEAT|EXTREME HEAT",stormd
 stormdata[grep("HYPERTHERMIA|WARM",stormdata$EVTYPE),]$EVTYPE="HEAT"
 #
 # combine the FLOOD Groups(FLASH-COMBINE FLash type events, FLOOD-All Other)
+# NOTE - Need to keep LAKESHORE FLOOD separate so careful selection will be needed
+
 stormdata[grep("FLASH|DAM BREAK|RAPIDLY RISING WATER",stormdata$EVTYPE),]$EVTYPE <- "FLASH FLOOD"
-stormdata[grep("FLOODING|HIGH WATER|ICE JAM",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
-stormdata[grep("RIVER FL|URBAN FL|RURAL FL|LAKE FL|STREAM FL",stormdata$EVTYPE),]$EVTYPE<- "FLOOD"
+stormdata[grep("FLOODING|HIGH WATER|ICE JAM|URBAN",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
+stormdata[grep("RIVER FL|URBAN FL|RURAL FL|STREAM FL",stormdata$EVTYPE),]$EVTYPE<- "FLOOD"
 stormdata[grep("FLOODS|MAJOR FL|& FLOOD|AND FLOOD|FLOOD &",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
-stormdata[grep("FLOOD/|/ FLOOD|LAKESHORE FL",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
+stormdata[grep("FLOOD/|/ FLOOD",stormdata$EVTYPE),]$EVTYPE <- "FLOOD"
 #
 # Create FREEZE Group
 #
@@ -169,8 +141,10 @@ stormdata[grep("^HAIL|SMALL HAIL|/HAIL",stormdata$EVTYPE),]$EVTYPE <- "HAIL"
 # Create a HEAVY RAIN Group (INCLUDE HEAVY PERCIP BECAUSE DATA COMMENT DISCUSSES RAINFALL)
 #
 stormdata[grep("FREEZING RAIN",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
-stormdata[grep("HEAVY RAIN|WETNESS|HEAVY SHOWER|HVY RAIN|HEAVY PRECIPITATION",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
-stormdata[grep("RECORD RAIN|RAINSTORM|UNSEASONAL RAIN|EXCESSIVE RAIN|RAIN/",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
+stormdata[grep("HEAVY RAIN|HEAVY SHOWER|HVY RAIN",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
+stormdata[grep("WETNESS|COOL AND WET|HEAVY PRECIPITATION",stormdata$EVTYPE),]$EVTYPE<-"HEAVY RAIN"
+stormdata[grep("RECORD RAIN|RAINSTORM|^UNSEASONAL RAIN",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
+stormdata[grep("EXCESSIVE RAIN|RAIN/|^RAIN$",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
 stormdata[grep("TORRENTIAL RAIN|WIND/RAIN",stormdata$EVTYPE),]$EVTYPE <- "HEAVY RAIN"
 #
 # Create a HEAVY SNOW Group
@@ -181,115 +155,154 @@ stormdata[grep("HEAVY LAKE SNOW|LATE SEASON",stormdata$EVTYPE),]$EVTYPE <- "HEAV
 # Create a HIGH SURF Group (Put RIP CURRENTS/SURF into RIP CURRENTS FIRST)
 #
 stormdata[grep("RIP",stormdata$EVTYPE),]$EVTYPE="RIP CURRENT"
-stormdata[grep("SURF",stormdata$EVTYPE),]$EVTYPE<-"HIGH SURF"
-#
+stormdata[grep("SURF|SWELLS|ROGUE WAVE|ROUGH SEA|HEAVY SEAS|HIGH SEAS|HIGH WAVE",stormdata$EVTYPE),]$EVTYPE<-"HIGH SURF"
 #
 # Create a HIGHWINDS
 #
-#raw data suggests this lone "HIGH" is high winds
-stormdata[stormdata$EVTYPE == "HIGH",]$EVTYPE <- "HIGH WINDS" 
-stormdata[grep("^HIGH WIND|HIGH  WINDS",stormdata$EVTYPE),]$EVTYPE <- "HIGH WINDS"
-
-
-
-
-
+#raw data suggests this lone "HIGH" is high wind
+stormdata[stormdata$EVTYPE == "HIGH",]$EVTYPE <- "HIGH WIND" 
+stormdata[grep("^HIGH WIND|HIGH  WINDS|STORM FORCE WIND",stormdata$EVTYPE),]$EVTYPE<-"HIGH WIND"
 #
-# Create a STRONG WINDS Group
-stormdata[grep("^WIND|GUSTY WIND|SEVERE TURBULENCE|^STRONG WIND|^GRADIENT",stormdata$EVTYPE),]$EVTYPE<-"STRONG WIND"
+# Create a HURRICANE Group
 #
-# Create a ICE Group before snow because a snow only group would pull out ICE AND SNOW 
-# assumption is if ICE is listed first, it is more impactful.
+stormdata[grep("HURRICANE|TYPHOON",stormdata$EVTYPE),]$EVTYPE <- "HURRICANE/TYPHOON"
 #
-stormdata[grep("^ICE|^ICY|GLAZE|BLACK ICE|ICE STORM",stormdata$EVTYPE),]$EVTYPE <- "ICE STORM"
+# Create a ICE Group before snow because doing snow first would pull out ICE AND SNOW 
+# -- assumption is if ICE is listed first, it is more impactful.
 #
-#Create a WINTER WEATHER GROUP
+#But first move non-ice storm events into Winter Weather & ICE FLOES to OTHER
+stormdata[grep("BLACK ICE|ROAD",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("ICE FLOES",stormdata$EVTYPE),]$EVTYPE <- "OTHER"
+stormdata[grep("^ICE|^ICY|GLAZE|ICE STORM",stormdata$EVTYPE),]$EVTYPE <- "ICE STORM"
 #
-stormdata[grep("WINTRY|WINTER WEATHER|WINTER STORM",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
-stormdata[grep("HEAVY MIX|MIXED PRECIP|FREEZING SPRAY",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
-stormdata[grep("RAIN/SNOW|FREEZING DRIZZLE",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
-
+# LAKE EFFECT SNOW
 #
-# Create a TORNADO Group
+stormdata[grep("LAKE.*SNOW",stormdata$EVTYPE),]$EVTYPE<- "LAKE EFFECT SNOW"
 #
-stormdata[grep("POUT|TORNADO|TORNDAO",stormdata$EVTYPE),]$EVTYPE <- "TORNADO"
+# LAKESHORE FLOODING
 #
-# Create a FIRE Group 
-#
-stormdata[grep("WILDFIRE|FIRE",stormdata$EVTYPE),]$EVTYPE <- "WILDFIRE"
-#
-# Create Gusty WIND group
-#
-stormdata[grep("GUSTY WIND|GUSTNADO",stormdata$EVTYPE),]$EVTYPE <- "GUSTY WIND"
-
-#
-# Create LANDSLIDE Group
-#
-stormdata[grep("SLIDE|LANDSLUMP",stormdata$EVTYPE),]$EVTYPE <- "LANDSLIDE"
-
-#
+stormdata[grep("LAKE FLOOD",stormdata$EVTYPE),]$EVTYPE<- "LAKESHORE FLOOD"
 # Create LIGHTNING Group
 #
 stormdata[grep("LIGHTNING|LIGHTING|LIGNTNING",stormdata$EVTYPE),]$EVTYPE <- "LIGHTNING"
 #
-# Create a THUNDERSTORM Group
+# Combine Marine TSTM and MARINE THUNDERSTORM EVENTS
 #
-stormdata[grep("THUNDER|TSTM|BURST|TUNDERSTORM|THUNERSTORM|THUDER|THUNDEER",stormdata$EVTYPE),]$EVTYPE <- "THUNDERSTORMS"
+stormdata[grep("MARINE TSTM",stormdata$EVTYPE),]$EVTYPE <- "MARINE THUNDERSTORM WIND"
+
+#
+# Create SLEET Group by putting SNOW/SLEET into WINTERWEATHER and leaving just SLEET
+#
+stormdata[grep("SNOW/SLEET",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+#
+# Create SURGE/TIED Group by combining the two types of STORM SURGE
+#
+stormdata[grep("STORM SURGE|HIGH TIDE",stormdata$EVTYPE),]$EVTYPE <- "STORM SURGE/TIDE"
+#
+# Create a STRONG WINDS Group
+stormdata[grep("^WIND|GUSTY WIND|SEVERE TURBULENCE",stormdata$EVTYPE),]$EVTYPE<-"STRONG WIND"
+stormdata[grep("^STRONG WIND|^GRADIENT|NON.*TSTM|WIND DAM",stormdata$EVTYPE),]$EVTYPE<-"STRONG WIND"
+#
+# Create a THUNDERSTORM WIND Group
+#
+stormdata[grep("^THUNDER|^TSTM|BURST|TUNDERSTORM|THUNERSTORM|THUDER|THUNDEER",stormdata$EVTYPE),]$EVTYPE <- "THUNDERSTORM WIND"
+stormdata[grep("^THUNDER|^SEVERE THUNDER",stormdata$EVTYPE),]$EVTYPE <- "THUNDERSTORM WIND"
+stormdata[grep("TSTM WIND|GUSTNADO|WHIRLWIND",stormdata$EVTYPE),]$EVTYPE <- "THUNDERSTORM WIND"
+#
+# Create a TORNADO Group
+#
+stormdata[grep("TORNADO|TORNDAO|LANDSPOUT",stormdata$EVTYPE),]$EVTYPE <- "TORNADO"
 #
 # Consolidate all TROPICAL STORM 
 #
-stormdata[grep("TROPICAL",stormdata$EVTYPE),]$EVTYPE <- "TROPICAL STORM"
-
+stormdata[grep("TROPICAL STORM",stormdata$EVTYPE),]$EVTYPE <- "TROPICAL STORM"
 #
-# Create a HURRICANE Group
+# Create a WATERSPOUT Group 
 #
-stormdata[grep("HURRICANE|TYPHOON",stormdata$EVTYPE),]$EVTYPE <- "HURRICANE"
-
-
-
-
-
-
-
+stormdata[grep("^WATERSPOUT",stormdata$EVTYPE),]$EVTYPE <- "WATERSPOUT"
 #
-# Create a SURF Group
+# Create a WILDFIRE Group 
 #
-stormdata[grep("URBAN",stormdata$EVTYPE),]$EVTYPE="URBAN AND SMALL"
-
-
-
-
+stormdata[grep("FIRE",stormdata$EVTYPE),]$EVTYPE <- "WILDFIRE"
+#
+#Create a WINTER STORM GROUP
+# From CODEBOOK-A winter weather event which has more than one significant hazard 
+#  (i.e., heavy snow and blowing snow; snow and ice; snow and sleet; sleet and ice; or snow, sleet 
+# and ice) 
+#
+stormdata[grep("WINTER STORM|BLOWING SNOW|HEAVY MIX",stormdata$EVTYPE),]$EVTYPE <- "WINTER STORM"
+stormdata[grep("SNOW AND ICE|SNOW/",stormdata$EVTYPE),]$EVTYPE <- "WINTER STORM"
+#
+# Create WINTER WEATHER GROUP
+stormdata[grep("MIXED PRECIP|^SNOW",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+#Carefully strip out Freezing to leave FREEZING FOG
+stormdata[grep("^FREEZING [RDS]",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
+stormdata[grep("^WINTER WEATHER|WINTRY|LIGHT SNOW",stormdata$EVTYPE),]$EVTYPE <- "WINTER WEATHER"
 #
 # Finally, create an OTHER group for things that don't fit nicely
 
-stormdata[grep("\\?|APACHE|ASTRONOMICAL|DROWNING|MARINE|VOLCANIC",stormdata$EVTYPE),]$EVTYPE <- "OTHER"
+stormdata[grep("\\?|APACHE|DROWNING|ACCIDENT|MISHAP|SLIDE|SLUMP",stormdata$EVTYPE),]$EVTYPE <- "OTHER"
 
 
 ```
 
 ## Results
+The following table shows the weather events with the number of fatalities, injuries and total of fatalities and injuries.  The table shows the top 10 events in descending ordered based on the Total number of harmful observations.  Tornados are by far the most dangerous weather event to humans by a almost 10 times more harm than Thunderstorm winds.
 
-``` {r harmful_report}
+``` {r total_harmful_report}
 fatalities <- aggregate(FATALITIES~EVTYPE,data=stormdata,FUN=sum)
-fatalities$Type <- "Fatalities"
-colnames (fatalities) <- c("EVTYPE","NUMBER","Type")
 injuries   <- aggregate(INJURIES~EVTYPE,data=stormdata,FUN=sum)
-injuries$Type <- "Injuries"
-colnames(injuries) <- c("EVTYPE","NUMBER","Type")
-bodilyharm <- rbind(fatalities,injuries)
-bodilyharm$Type <- as.factor(bodilyharm$Type)
+bodilyharm <- cbind(fatalities[,1:2], injuries[,2])
+colnames(bodilyharm)<- c("Event","Fatalities","Injuries")
+bodilyharm$Total <- bodilyharm$Fatalities + bodilyharm$Injuries
+Top10_PersonalHarm <- head(arrange(bodilyharm, Total, decreasing=TRUE),n=10)
+Top10_PersonalHarm[, c("Event", "Total")]
 
+```
+Looking at fatalities and injuries individually, tornados remain at the top of bot types of injuries but that is where the commonality ends.  Excessive Heat is the #2 event for fatalities and #3 in overall injuries.  
+
+Ice storms and fires show up in the injuries list but they aren't in the top 10 of fatalities.  Likewise, rip currents and Extreme cold/wind chill are more fatal than causing injuries.
+``` {r fatalities_injuries_sidexside}
+Top10_fatalities <- head(arrange(bodilyharm, Fatalities, decreasing=TRUE),n=10)
+Top10_fatalities <- Top10_fatalities [,1:2]
+colnames (Top10_fatalities) <- c("Event","Number")
+
+Top10_injuries <- head(arrange(bodilyharm, Injuries, decreasing=TRUE),n=10)
+Top10_injuries <- Top10_injuries [,c(1,3)]
+colnames (Top10_injuries) <- c("Event","Number")
+
+
+Top10_fatalities
+Top10_injuries
+```
+Figure 1 shows the total harm to the public health for each of the top 10 event types for fatalities and injuries.  In order to visually see the relative numbers for fatalities and injuries for each of the events, the y-axis is arbitrarily clipped at 15,000.  
+
+
+``` {r harmful_plot}
+
+#build the plot tables by combining both individual tables into a single table
+
+Top10_fatalities$Type <- "Fatalities"
+Top10_injuries$Type <- "Injuries"
+bodilyharm <- rbind(Top10_fatalities,Top10_injuries)
+bodilyharm$Type <- as.factor(bodilyharm$Type)
+#
+#add in the missing values for the fatalities/injuries
+bodilyharm <- rbind(bodilyharm,c("EXTREME COLD/WIND CHILL",sum(stormdata[grep("EXTREME COLD/WIND CHILL",stormdata$EVTYPE),]$INJURIES),"Injuries"))
+bodilyharm <- rbind(bodilyharm,c("RIP CURRENT",sum(stormdata[grep("RIP CURRENT",stormdata$EVTYPE),]$INJURIES),"Injuries"))
+bodilyharm <- rbind(bodilyharm,c("ICE STORM",sum(stormdata[grep("ICE STORM",stormdata$EVTYPE),]$FATALITIES),"Fatalities"))
+bodilyharm <- rbind(bodilyharm,c("WILDFIRE",sum(stormdata[grep("WILDFIRE",stormdata$EVTYPE),]$FATALITIES),"Fatalities"))
+bodilyharm$Number <- as.numeric (bodilyharm$Number)
 
 #
 # Plot the events that were harmful to the population
 #
 #create a line plot to show trend
-g<- ggplot (bodilyharm, aes(x=EVTYPE, y=NUMBER, fill=factor(Type)))
+g<- ggplot (bodilyharm, aes(x=Event, y=Number, fill=factor(Type)))
 g + geom_bar(position="stack",stat="identity")+ 
-        labs(title="Event Types Harmful to Public Health",fill="",x="Event Type",y="Number of Fatalities/Injuries")+
+        labs(title="Figure 1 - Event Types Harmful to Public Health\n",fill="",
+         x="Event Type",y="Number of Fatalities/Injuries")+
+         coord_cartesian(ylim = c(0,15000))+
          theme(axis.text.x=element_text(angle=70,hjust=1))
-        
-
-
 
 ```
