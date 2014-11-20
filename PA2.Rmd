@@ -1,6 +1,7 @@
 ---
 title: "Reproducible Results - <BR>
-Analysis of  NOAA Storm Database"
+Impact of Weather Related Events in terms of Harm to Public Health and Economic Impact<br>
+For the Period of 1950 - November 2011"
 author: "richdata"
 date: "Tuesday, November 11, 2014"
 output: html_document
@@ -9,25 +10,25 @@ output: html_document
 
 
 ## Synopsis
-Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+In this report I will analyze the human and economic impact of weather related events the United States between the years 1950 and 2011. The  hypothesis is that storms and other severe weather events can cause both public health and economic problems for communities and municipalities.  Reviewing NOASS's data for the years 1950 and 2011, I found that, tornados had a significantly larger impact on human life than any other event but surprisingly, it didn't translate to significant economic impact where floods topped the list of economic impact caused by weather events.
 
-This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
-
-The basic goal of this assignment is to explore the NOAA Storm Database and answer two questions about severe weather events. 
-
+This report will summarize the results of exploring the NOAA Storm Database and specifically answer two questions:
 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 2. Across the United States, which types of events have the greatest economic consequences?
 
 ## Data Processing 
-### Initialization
-To begin, some initial housekeeping is required to ensure this is a reproducible research project by installing/loading the needed datasets, documenting the environment, downloading the data and reading the file.  It should be noted that there was a considerable exploration effort outside of this document that gained some insights into the data.  Those efforts are not included here.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+### *Initialization*
+To begin, some initial housekeeping is required to ensure this is a reproducible research project by installing/loading the needed datasets, documenting the environment, downloading the data and reading the file.  It should be noted that there was a considerable exploration effort outside of this document to gain some insights into the data.  For brevity, those efforts are not included here.
 
 
 ``` {r initialsetup}
 #
 #install and load the ggplot2 package
 
-#install.packages ("ggplot2", repos="http://cran.rstudio.com/")
+install.packages ("ggplot2", repos="http://cran.rstudio.com/", quiet=TRUE)
 library (ggplot2)
 library (grid)  #needed for theme panel margin units
 library (plyr)
@@ -38,7 +39,9 @@ library (plyr)
 sessionInfo ()
 
 ```
-
+<br>
+If the directory or files already exist, then don't create them or download the data again as the download could be a timely process because the file is quite large.
+<br>
 
 ```{r getdata}
 setwd ("~/My Personal Stuff/coursera/Reproducible Research/Project2")
@@ -64,10 +67,14 @@ stormdata <- stormdata [, c("EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGE
 
 ```
 
-### Cleaning the data
-To speed things up somewhat, the original dataset will be stripped of unnecessary columns and any rows that contain zero values in all relevant study variables (i.e. Fatalities, Injuries, Property Damage and Crop Damage).  This reduction will remove 30 variables and over 65,000 observations.
+### *Cleaning the data & transformations*
+To speed things up, the original dataset will be stripped of unnecessary columns and any rows that contain zero values in all relevant study variables (i.e. Fatalities, Injuries, Property Damage and Crop Damage).  This reduction removed 30 variables and over 65,000 observations.
 
-Additionally, the CODEBOOK associated with this dataset, https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf, suggests there are 48 unique events.  However, initial exploration of the EVTYPES in the dataset indicated there were 898 different event types!  Some significant cleaning and consolidation of the data will be needed.
+Additionally, the CODEBOOK associated with this dataset, https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf, suggests there are 48 differientiating events.  However, initial exploration of the EVTYPES in the dataset indicated there were 898 different coded event types!  Some cleaning of obvious typos and significant consolidation of the data was required.
+
+To nicely handle coded events that didn't fit easily into a pre-established group, things like Drowning and Marine Mishap were placed into the OTHER category.
+
+After the groupings were established, the damage classifications needed to be cleaned up a bit.  The Codebook said damage amounts should have alphabetical characters to signify magnitude such as “K” for thousands, “M” for millions, and “B” for billions.  However, upon inspection of the data, there were characters (i.e. ?, - or +) and numbers.  Since the number of records with the characters were small and the associated amounts were small, it was decided to remove those observations from the dataset.  However, the number of records with numeric indicators was significant.  An inspection of several remarks variables, it was determined that the numeric indicators were an order of magnitude and were kept in the dataset under that assumption and the K, M and B indicators were converted to 3,6 and 9 respectively to remain consistent with the previous assumption.
 
 
 ``` {r cleandata}
@@ -265,6 +272,9 @@ stormdata[grep("[bB]",stormdata$CROPDMGEXP),]$CROPDMGEXP <- 9
 ```
 
 ## Results
+### *Fatalities & Injuries*
+*1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?*
+
 The following table shows the weather events with the number of fatalities, injuries and total of fatalities and injuries.  The table shows the top 10 events in descending ordered based on the Total number of harmful observations.  Tornados are by far the most dangerous weather event to humans by a almost 10 times more harm than Thunderstorm winds.
 
 ``` {r total_harmful_report}
@@ -278,9 +288,14 @@ Top10_PersonalHarm <- head(arrange(bodilyharm, Total, decreasing=TRUE),n=10)
 Top10_PersonalHarm[, c("Event", "Total")]
 
 ```
-Looking at fatalities and injuries individually, tornados remain at the top of bot types of injuries but that is where the commonality ends.  Excessive Heat is the #2 event for fatalities and #3 in overall injuries.  
+**Table 1** - Total number of fatalities and injuries
+<br>
+<br>
 
-Ice storms and fires show up in the injuries list but they aren't in the top 10 of fatalities.  Likewise, rip currents and Extreme cold/wind chill are more fatal than causing injuries.
+Next, looking at fatalities and injuries individually, tornados remain at the top of both types of weather events but that is where the commonality ends.  Excessive Heat is the #2 event for fatalities and moves to #3 by injuries.  
+
+Rip currents and Extreme cold/wind chill are more fatal but do not show up on the top 10 of injuries suggesting those events are more like to have a fatal impact and extra caution should be exercised during those events. Likewise, ice storms and fires show up in the injuries list but they aren't in the top 10 of fatalities. 
+
 ``` {r fatalities_injuries_sidexside}
 Top10_fatalities <- head(arrange(bodilyharm, Fatalities, decreasing=TRUE),n=10)
 Top10_fatalities <- Top10_fatalities [,1:2]
@@ -293,7 +308,11 @@ colnames (Top10_injuries) <- c("Event","Number")
 cbind (Top10_fatalities[,1:2], Top10_injuries[,1:2])
 
 ```
-Figure 1 shows the total harm to the public health for each of the top 10 event types for fatalities and injuries.  In order to visually see the relative numbers for fatalities and injuries for each of the events, the y-axis is arbitrarily clipped at 15,000.  
+**Table 2** - Comparison of fatalities (left) and injuries (right) for the top 10 events
+<br>
+<br>
+
+Figure 1 below visually shows the total harm to the public health for each of the top 10 event types for fatalities and injuries.  In order to visually see the relative numbers for fatalities and injuries for each of the events, the y-axis is arbitrarily clipped at 15,000.  
 
 
 ``` {r harmful_plot}
@@ -312,49 +331,66 @@ bodilyharm <- rbind(bodilyharm,c("ICE STORM",sum(stormdata[grep("ICE STORM",stor
 bodilyharm <- rbind(bodilyharm,c("WILDFIRE",sum(stormdata[grep("WILDFIRE",stormdata$EVTYPE),]$FATALITIES),"Fatalities"))
 bodilyharm$Number <- as.numeric (bodilyharm$Number)
 bodilyharm <- arrange (bodilyharm, bodilyharm$Type)
+# Remove the two smallest to create a top 10
+bodilyharm <-bodilyharm [-grep("EXTREME COLD",bodilyharm$Event),]
+bodilyharm <-bodilyharm [-grep("RIP CURRENT",bodilyharm$Event),]
 
 #
 # Plot the events that were harmful to the population
 #
-#create a line plot to show trend
-g<- ggplot (bodilyharm, aes(x=Event, y=Number, fill=factor(Type))) + coord_flip ()
+ #create a line plot to show trend
+g<- ggplot (bodilyharm, aes(x=Event, y=Number, fill=factor(Type)))
 g + geom_bar(position="stack",stat="identity")+ 
-        labs(title="Figure 1 - Event Types Harmful to Public Health\n",fill="",
+        labs(title="Figure 1 - Top 10 Weather Events Most Harmful to Public Health\n",fill="",
         x="",y="Number of Fatalities/Injuries")+
         coord_flip (ylim = c(0,15000))+
-        annotate("text", x = "TORNADO", y = 13000, label = as.character(sum(bodilyharm[grep("TORNADO",bodilyharm$Event),]$Number)))
+        annotate("text", x = "TORNADO", y = 13800, label = as.character(sum(bodilyharm[grep("TORNADO",bodilyharm$Event),]$Number)))
 
 ```
 
 
-Damage report
+### *Damages*
+*2. Across the United States, which types of events have the greatest economic consequences?*<br>
+Now we turn our attention to the economic impact of weather related events.  As can be seen on the following tables, floods and hurricanes/typhoons are the two most economically significant events in terms of property and agricultural damage.  Not surprising, drought pushes flood and hurricanes out of the top 2 spots for agricultural damages.
+
 
 ``` {r damage_report}
 #
 #calculate total property and crop damage for each observation
 stormdata$PROPAMT <- stormdata$PROPDMG* 10^as.numeric(stormdata$PROPDMGEXP)/(10^9)
 stormdata$CROPAMT <- stormdata$CROPDMG*10^as.numeric(stormdata$CROPDMGEXP)/(10^9)
-
+#group computed damage amounts by event types
 propdmg <- aggregate(PROPAMT~EVTYPE,data=stormdata,FUN=sum)
 cropdmg <- aggregate(CROPAMT~EVTYPE,data=stormdata,FUN=sum)
-
+# determine the top 10 events of property damage
 damage <- aggregate (PROPAMT~EVTYPE, data=stormdata, FUN=sum)
 Top10_propdmg <- head(arrange(damage, PROPAMT, decreasing=TRUE),n=10)
 Top10_propdmg$PROPAMT <- Top10_propdmg$PROPAMT
 Top10_propdmg$Type <- "PROPDMG"
 colnames (Top10_propdmg) <- c("Event","Damages","Type")
-
+# determine the top 10 events of crop damage
 damage <- aggregate (CROPAMT~EVTYPE, data=stormdata, FUN=sum)
 Top10_cropdmg <- head(arrange(damage, CROPAMT, decreasing=TRUE),n=10)
 Top10_cropdmg$CROPAMT <- Top10_cropdmg$CROPAMT
 Top10_cropdmg$Type <- "CROPDMG"
 colnames (Top10_cropdmg) <- c("Event","Damages","Type")
-
+#display the top 10 events of property & crop damage
 cbind (Top10_propdmg[,1:2], Top10_cropdmg[,1:2])
 
+```
+**Table 3** -  Comparisons of property (left) and crop (right) damages for top 10 events
+<br>
+<br>
+
+Surprisingly, although tornados appear at the top of the fatalities and injuries list, it drops to nummber 3 on property damage and doesn't appear on crop damage lists.  Floods and hurricanes/typhoons cause the most damage to property and crops only to be obviously surpassed by drought for crops.
+
+
+``` {r damages_plot}
+#build the dataframe to be used for the graphical plot comparison
 damages <- rbind (Top10_propdmg,Top10_cropdmg)
 
-#add in the missing values for the fatalities/injuries
+#add in the missing values for the property & crop damages as each DF had a different top 10 and we should include for completeness
+
 damages <- rbind(damages,c("DROUGHT",propdmg[grep("DROUGHT",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
 damages <- rbind(damages,c("EXTREME COLD/WIND CHILL",propdmg[grep("EXTREME COLD/WIND CHILL",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
 damages <- rbind(damages,c("FROST/FREEZE",propdmg[grep("FROST/FREEZE",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
@@ -365,10 +401,10 @@ damages <- rbind(damages,c("TORNADO",cropdmg[grep("TORNADO",cropdmg$EVTYPE),]$CR
 damages <- rbind(damages,c("TROPICAL STORM",cropdmg[grep("TROPICAL STORM",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
 damages <- rbind(damages,c("WILDFIRE",cropdmg[grep("WILDFIRE",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
 damages <- rbind(damages,c("WINTER STORM",cropdmg[grep("WINTER STORM",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
-
 damages$Damages <- as.numeric (damages$Damages)
-
+# fix r-quirk to make sure fatalities are always the leftmost bar
 damages <- arrange(damages,damages$Type)
+
 
 #
 # Plot the events that were harmful to the population
@@ -376,7 +412,17 @@ damages <- arrange(damages,damages$Type)
 #create a line plot to show trend
 g<- ggplot (damages, aes(x=Event, y=Damages, fill=factor(Type)))
 g + geom_bar(position="stack",stat="identity")+ 
-        labs(title="Figure 2 - Damages by Event Type\n",fill="",
-        y="Damages \n$ Billions")+
+        labs(title="Figure 2 - Top 15 events having the largest economic impact\n",fill="",
+        x="",y="Damages \n$ Billions")+
         coord_flip () 
 ```
+
+### Summary
+
+Weather events have a significant cost on our lives in terms of personal harm and damage costs.  The analysis reveals that:
+
+- Tornadoes are the most significant weather related event in terms of injuries and fatalities in the U.S.  They cause more than twice the number of fatalities and more than 10 times more injuries than next closest event.
+- Excessive heat is the next closest event causing fatalities and the 3rd highest event of injuries.
+- Highest economic impact is caused by floods, largely as a result of the $`r as.numeric(Top10_propdmg [1,2])` billion in property damages.
+- Hurricanes and Typhoons are the 2nd and 3rd most damaging events for property and crops respectively.  
+- Not surprisingly, Drought pushed Flood and Hurricane/Typhoons out of the Crop damage top spots.
