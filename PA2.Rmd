@@ -243,7 +243,25 @@ stormdata[grep("^WINTER WEATHER|WINTRY|LIGHT SNOW",stormdata$EVTYPE),]$EVTYPE <-
 
 stormdata[grep("\\?|APACHE|DROWNING|ACCIDENT|MISHAP|SLIDE|SLUMP",stormdata$EVTYPE),]$EVTYPE <- "OTHER"
 
+#----------------------------------------------------------------------------------
+# Clean up the property/crop Damage EXplanation (PROPDMGEXP & CROPDMGEXP)
+# Drop everything that is not H/K/M/B because the code book says it should be characters
+#stripout all rows that have 0 for prop & crop damage
+#stormdata <- stormdata[apply(stormdata[,c(4,6)],1,function(z) any(z!=0)),] 
+#strip out any rows that have a + or ?
+stormdata <- subset(stormdata, stormdata$PROPDMGEXP != "+" & stormdata$PROPDMGEXP != 
+    "-" & stormdata$PROPDMGEXP != "?" & stormdata$CROPDMGEXP != "+" & stormdata$CROPDMGEXP != "-" & stormdata$CROPDMGEXP != "?" )
 
+stormdata$PROPDMGEXP <- as.character(stormdata$PROPDMGEXP)
+stormdata[grep("[hH]",stormdata$PROPDMGEXP),]$PROPDMGEXP <- 2
+stormdata[grep("[kK]",stormdata$PROPDMGEXP),]$PROPDMGEXP <- 3
+stormdata[grep("[mM]",stormdata$PROPDMGEXP),]$PROPDMGEXP <- 6
+stormdata[grep("[bB]",stormdata$PROPDMGEXP),]$PROPDMGEXP <- 9
+
+stormdata$CROPDMGEXP <- as.character(stormdata$CROPDMGEXP)
+stormdata[grep("[kK]",stormdata$CROPDMGEXP),]$CROPDMGEXP <- 3
+stormdata[grep("[mM]",stormdata$CROPDMGEXP),]$CROPDMGEXP <- 6
+stormdata[grep("[bB]",stormdata$CROPDMGEXP),]$CROPDMGEXP <- 9
 ```
 
 ## Results
@@ -256,6 +274,7 @@ bodilyharm <- cbind(fatalities[,1:2], injuries[,2])
 colnames(bodilyharm)<- c("Event","Fatalities","Injuries")
 bodilyharm$Total <- bodilyharm$Fatalities + bodilyharm$Injuries
 Top10_PersonalHarm <- head(arrange(bodilyharm, Total, decreasing=TRUE),n=10)
+
 Top10_PersonalHarm[, c("Event", "Total")]
 
 ```
@@ -271,9 +290,8 @@ Top10_injuries <- head(arrange(bodilyharm, Injuries, decreasing=TRUE),n=10)
 Top10_injuries <- Top10_injuries [,c(1,3)]
 colnames (Top10_injuries) <- c("Event","Number")
 
+cbind (Top10_fatalities[,1:2], Top10_injuries[,1:2])
 
-Top10_fatalities
-Top10_injuries
 ```
 Figure 1 shows the total harm to the public health for each of the top 10 event types for fatalities and injuries.  In order to visually see the relative numbers for fatalities and injuries for each of the events, the y-axis is arbitrarily clipped at 15,000.  
 
@@ -293,16 +311,72 @@ bodilyharm <- rbind(bodilyharm,c("RIP CURRENT",sum(stormdata[grep("RIP CURRENT",
 bodilyharm <- rbind(bodilyharm,c("ICE STORM",sum(stormdata[grep("ICE STORM",stormdata$EVTYPE),]$FATALITIES),"Fatalities"))
 bodilyharm <- rbind(bodilyharm,c("WILDFIRE",sum(stormdata[grep("WILDFIRE",stormdata$EVTYPE),]$FATALITIES),"Fatalities"))
 bodilyharm$Number <- as.numeric (bodilyharm$Number)
+bodilyharm <- arrange (bodilyharm, bodilyharm$Type)
 
 #
 # Plot the events that were harmful to the population
 #
 #create a line plot to show trend
-g<- ggplot (bodilyharm, aes(x=Event, y=Number, fill=factor(Type)))
+g<- ggplot (bodilyharm, aes(x=Event, y=Number, fill=factor(Type))) + coord_flip ()
 g + geom_bar(position="stack",stat="identity")+ 
         labs(title="Figure 1 - Event Types Harmful to Public Health\n",fill="",
-         x="Event Type",y="Number of Fatalities/Injuries")+
-         coord_cartesian(ylim = c(0,15000))+
-         theme(axis.text.x=element_text(angle=70,hjust=1))
+        x="",y="Number of Fatalities/Injuries")+
+        coord_flip (ylim = c(0,15000))+
+        annotate("text", x = "TORNADO", y = 13000, label = as.character(sum(bodilyharm[grep("TORNADO",bodilyharm$Event),]$Number)))
 
+```
+
+
+Damage report
+
+``` {r damage_report}
+#
+#calculate total property and crop damage for each observation
+stormdata$PROPAMT <- stormdata$PROPDMG* 10^as.numeric(stormdata$PROPDMGEXP)/(10^9)
+stormdata$CROPAMT <- stormdata$CROPDMG*10^as.numeric(stormdata$CROPDMGEXP)/(10^9)
+
+propdmg <- aggregate(PROPAMT~EVTYPE,data=stormdata,FUN=sum)
+cropdmg <- aggregate(CROPAMT~EVTYPE,data=stormdata,FUN=sum)
+
+damage <- aggregate (PROPAMT~EVTYPE, data=stormdata, FUN=sum)
+Top10_propdmg <- head(arrange(damage, PROPAMT, decreasing=TRUE),n=10)
+Top10_propdmg$PROPAMT <- Top10_propdmg$PROPAMT
+Top10_propdmg$Type <- "PROPDMG"
+colnames (Top10_propdmg) <- c("Event","Damages","Type")
+
+damage <- aggregate (CROPAMT~EVTYPE, data=stormdata, FUN=sum)
+Top10_cropdmg <- head(arrange(damage, CROPAMT, decreasing=TRUE),n=10)
+Top10_cropdmg$CROPAMT <- Top10_cropdmg$CROPAMT
+Top10_cropdmg$Type <- "CROPDMG"
+colnames (Top10_cropdmg) <- c("Event","Damages","Type")
+
+cbind (Top10_propdmg[,1:2], Top10_cropdmg[,1:2])
+
+damages <- rbind (Top10_propdmg,Top10_cropdmg)
+
+#add in the missing values for the fatalities/injuries
+damages <- rbind(damages,c("DROUGHT",propdmg[grep("DROUGHT",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
+damages <- rbind(damages,c("EXTREME COLD/WIND CHILL",propdmg[grep("EXTREME COLD/WIND CHILL",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
+damages <- rbind(damages,c("FROST/FREEZE",propdmg[grep("FROST/FREEZE",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
+damages <- rbind(damages,c("HEAVY RAIN",propdmg[grep("HEAVY RAIN",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
+damages <- rbind(damages,c("ICE STORM",propdmg[grep("ICE STORM",propdmg$EVTYPE),]$PROPAMT,"PROPDMG"))
+damages <- rbind(damages,c("STORM SURGE/TIDE",cropdmg[grep("STORM SURGE/TIDE",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
+damages <- rbind(damages,c("TORNADO",cropdmg[grep("TORNADO",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
+damages <- rbind(damages,c("TROPICAL STORM",cropdmg[grep("TROPICAL STORM",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
+damages <- rbind(damages,c("WILDFIRE",cropdmg[grep("WILDFIRE",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
+damages <- rbind(damages,c("WINTER STORM",cropdmg[grep("WINTER STORM",cropdmg$EVTYPE),]$CROPAMT,"CROPDMG"))
+
+damages$Damages <- as.numeric (damages$Damages)
+
+damages <- arrange(damages,damages$Type)
+
+#
+# Plot the events that were harmful to the population
+#
+#create a line plot to show trend
+g<- ggplot (damages, aes(x=Event, y=Damages, fill=factor(Type)))
+g + geom_bar(position="stack",stat="identity")+ 
+        labs(title="Figure 2 - Damages by Event Type\n",fill="",
+        y="Damages \n$ Billions")+
+        coord_flip () 
 ```
